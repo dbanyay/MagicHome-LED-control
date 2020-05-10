@@ -1,29 +1,26 @@
 from flux_led import WifiLedBulb, BulbScanner
 from audio_stream import AudioStream, AudioInputDevices
 from calculate_rgb_alpha import calculate_rgb
-from time import sleep
 import numpy as np
 from collections import deque
-from time import perf_counter
 from enum import auto, Enum
 from capture_screen_color import calculate_monitor_average
 
 
 class LEDControlMode(Enum):
-    AUDIO_STERO_MIX = auto()
+    AUDIO_STEREO_MIX = auto()
     AUDIO_MIC = auto()
     MONITOR_COLOR = auto()
 
 
 class LEDController():
     def __init__(self,
-                 mode: LEDControlMode = LEDControlMode.AUDIO_STERO_MIX,
-                 rgb_buffer_len: int = 5,
-                 alpha_buffer_len: int = 10):
+                 mode: LEDControlMode = LEDControlMode.AUDIO_STEREO_MIX,
+                 rgb_buffer_len: int = 5):
 
         self.mode = mode
 
-        if self.mode == LEDControlMode.AUDIO_STERO_MIX:
+        if self.mode == LEDControlMode.AUDIO_STEREO_MIX:
             rgb_buffer_len = 5
             NPERSEG = 2048
             self.audio_stream = AudioStream(audio_device=AudioInputDevices.STEREO_MIX, chunk=NPERSEG)
@@ -55,7 +52,8 @@ class LEDController():
             for bulb in self.bulbs:
                 bulb.setRgb(r, g, b)
 
-        elif self.mode == LEDControlMode.AUDIO_STERO_MIX:
+        elif self.mode == LEDControlMode.AUDIO_STEREO_MIX:
+
             wav_chunk = self.audio_stream.read_audio()
             r, g, b = calculate_rgb(wav_chunk, fs=self.audio_stream.rate, nperseg=len(wav_chunk))
 
@@ -78,7 +76,9 @@ class LEDController():
 
 if __name__ == '__main__':
 
-    led_controller = LEDController(mode=LEDControlMode.MONITOR_COLOR)
+    # led_controller = LEDController(mode=LEDControlMode.MONITOR_COLOR)
+    led_controller = LEDController()
+
 
     while 1:
         led_controller.updateLED()
