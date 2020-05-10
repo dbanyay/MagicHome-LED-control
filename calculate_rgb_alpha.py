@@ -15,69 +15,86 @@ class HUECOLORS():
     CYAN = 175
     BLUE = 240
     MAGENTA = 310
+    RANDOM = -1
 
 
-def calculate_rgb(cur_segment, fs: int = 44100,
-                  nperseg: int = 512,
-                  start_hue: HUECOLORS = HUECOLORS.RED,
-                  reverse_hue: bool = False):
-    output_hue_array = create_hue_array(start_hue, reverse_hue)
+class AudioController():
+    def __init__(self,
+                 fs: int = 44100,
+                 nperseg: int = 2048,
+                 start_hue: int = HUECOLORS.RED,
+                 inverse_hue: bool = False,
+                 num_colors: int = 300,
+                 alpha_rms_max: int = 1000,
+                 alpha_min: int = 0.1,
+                 audio_min_freq: int = 40,
+                 audio_max_freq: int = 1000,
+                 is_verbose: bool=True):
 
-    # perform C weighting filter twice
-    c_weighted_cur_segment = weight_signal(cur_segment, weighting="C")
-    c_weighted_cur_segment = weight_signal(c_weighted_cur_segment, weighting="C")
+        # audio related parameters
+        self.fs = fs
+        self.nperseg = nperseg
+        self.alpha_rms_max = alpha_rms_max
+        self.audio_min_freq = audio_min_freq
+        self.audio_max_freq = audio_max_freq
 
-    # Fourier-transform signal
-    f, t, Sxx = spectrogram(c_weighted_cur_segment, fs=fs, nperseg=nperseg)
-    calculated_hue = color_mapping(Sxx, f, output_hue_array) / 360
+        # light related parameters
+        self.alpha_min = alpha_min
+        self.num_colors = num_colors
+        self.start_hue = start_hue
+        self.inverse_hue = inverse_hue
+        self.hue_array = self.create_hue_array()
 
-    # calculate RMS to control light intensity
-    rms = np.sqrt(np.mean(np.array(c_weighted_cur_segment, dtype=np.float) ** 2))
+        self.is_verbose = is_verbose
 
-    if rms / ALPHA_MAX < ALPHA_MIN:
-        alpha = 2
-    elif rms / ALPHA_MAX > 1:
-        alpha = 1
-    else:
-        alpha = rms / ALPHA_MAX
+    def calculate_rgb(self, cur_segment):
 
-    rgb_norm = colorsys.hls_to_rgb(calculated_hue, alpha / 2, 1)
+        # perform C weighting filter twice
+        c_weighted_cur_segment = weight_signal(cur_segment, weighting="C")
+        c_weighted_cur_segment = weight_signal(c_weighted_cur_segment, weighting="C")
 
-    r = int(np.round(rgb_norm[0] * 255))
-    g = int(np.round(rgb_norm[1] * 255))
-    b = int(np.round(rgb_norm[2] * 255))
+        # Fourier-transform signal
+        f, t, Sxx = spectrogram(c_weighted_cur_segment, fs=self.fs, nperseg=self.nperseg)
+        calculated_hue = self.color_mapping(Sxx, f) / 360
 
-    return r, g, b
+        # calculate RMS to control light intensity
+        rms = np.sqrt(np.mean(np.array(c_weighted_cur_segment, dtype=np.float) ** 2))
 
-
-def create_hue_array(start_hue, inverse_hue):
-    if inverse_hue:
-        hue_array = np.arange(start_hue, start_hue - NUM_COLORS, step=-1)
-        hue_array[hue_array < 0] += 360
-
-    else:
-        hue_array = np.arange(start_hue, start_hue + NUM_COLORS)
-        hue_array[hue_array >= 360] -= 360
-    return hue_array
-
-
-def color_mapping(Sxx, f, hue_array):
-    dominant_freq = f[np.argmax(Sxx)]
-    lin_f = np.linspace(start=MIN_FREQ, stop=MAX_FREQ, num=NUM_COLORS)
-    lin_hue = closest_freq(lin_f, dominant_freq)
-    return hue_array[lin_hue]
-
-
-def closest_freq(freq_array, K):
-    idx = (np.abs(freq_array - K)).argmin()
-    return idx
+        if rms / self.alpha_rms_max < self.alpha_min:
+            alpha = 2
+        elif rms / self.alpha_rms_max > 1:
+            alpha = 1
+        else:
+            alpha = rms / self.alpha_rms_max
 
 
-NUM_COLORS = 300  # range from 0 to NUM_COLORS
-# ALPHA_MAX = 32768
-ALPHA_MAX = 1000
+        if self.is_verbose:
+            print(f'calculated hue: {calculated_hue}, alpha: {alpha}, measured rms: {rms}')
 
-ALPHA_MIN = 0.1
-AUDIO_FS = 44100
-MIN_FREQ = 40
-MAX_FREQ = 1000
+        rgb_norm = colorsys.hls_to_rgb(calculated_hue, alpha / 2, 1)
+
+        r = int(np.round(rgb_norm[0] * 255))
+        g = int(np.round(rgb_norm[1] * 255))
+        b = int(np.round(rgb_norm[2] * 255))
+
+        return r, g, b
+
+    def create_hue_array(self):
+        if self.inverse_hue:
+            hue_array = np.arange(self.start_hue, self.start_hue - self.num_colors, step=-1)
+            hue_array[hue_array < 0] += 360
+
+        else:
+            hue_array = np.arange(self.start_hue, self.start_hue + self.num_colors)
+            hue_array[hue_array >= 360] -= 360
+        return hue_array
+
+    def color_mapping(self, Sxx, f):
+        dominant_freq = f[np.argmax(Sxx)]
+        lin_f = np.linspace(start=self.audio_min_freq, stop=self.audio_max_freq, num=self.num_colors)
+        lin_hue = self.closest_freq(lin_f, dominant_freq)
+        return self.hue_array[lin_hue]
+
+    def closest_freq(self, freq_array, K):
+        idx = (np.abs(freq_array - K)).argmin()
+        return idx
