@@ -2,7 +2,6 @@
 # pavucontrol
 
 import numpy as np
-import colorsys
 from scipy.signal import spectrogram
 from pyfilterbank.splweighting import weight_signal
 
@@ -22,14 +21,14 @@ class AudioController():
     def __init__(self,
                  fs: int = 44100,
                  nperseg: int = 2048,
-                 start_hue: int = HUECOLORS.RED,
-                 inverse_hue: bool = False,
-                 num_colors: int = 300,
-                 alpha_rms_max: int = 1000,
-                 alpha_min: int = 0.1,
+                 start_hue: int = HUECOLORS.GREEN,
+                 inverse_hue: bool = True,
+                 num_colors: int = 200,
+                 alpha_rms_max: int = 3000,
+                 alpha_min: int = 0.01,
                  audio_min_freq: int = 40,
                  audio_max_freq: int = 1000,
-                 is_verbose: bool=True):
+                 is_verbose: bool = True):
 
         # audio related parameters
         self.fs = fs
@@ -55,7 +54,7 @@ class AudioController():
 
         # Fourier-transform signal
         f, t, Sxx = spectrogram(c_weighted_cur_segment, fs=self.fs, nperseg=self.nperseg)
-        calculated_hue = self.color_mapping(Sxx, f) / 360
+        calculated_hue, dominant_freq = self.color_mapping(Sxx, f, mode='log')
 
         # calculate RMS to control light intensity
         rms = np.sqrt(np.mean(np.array(c_weighted_cur_segment, dtype=np.float) ** 2))
@@ -67,17 +66,11 @@ class AudioController():
         else:
             alpha = rms / self.alpha_rms_max
 
-
         if self.is_verbose:
-            print(f'calculated hue: {calculated_hue}, alpha: {alpha}, measured rms: {rms}')
+            print(
+                f'dominant freq: {dominant_freq:.2f}Hz, calculated hue: {calculated_hue:.2f}, alpha: {alpha:.2f}, measured rms: {rms:.2f}')
 
-        rgb_norm = colorsys.hls_to_rgb(calculated_hue, alpha / 2, 1)
-
-        r = int(np.round(rgb_norm[0] * 255))
-        g = int(np.round(rgb_norm[1] * 255))
-        b = int(np.round(rgb_norm[2] * 255))
-
-        return r, g, b
+        return calculated_hue, alpha
 
     def create_hue_array(self):
         if self.inverse_hue:
@@ -89,11 +82,18 @@ class AudioController():
             hue_array[hue_array >= 360] -= 360
         return hue_array
 
-    def color_mapping(self, Sxx, f):
+    def color_mapping(self, Sxx, f, mode='lin'):
         dominant_freq = f[np.argmax(Sxx)]
         lin_f = np.linspace(start=self.audio_min_freq, stop=self.audio_max_freq, num=self.num_colors)
         lin_hue = self.closest_freq(lin_f, dominant_freq)
-        return self.hue_array[lin_hue]
+        if mode == 'lin':
+            return self.hue_array[lin_hue], dominant_freq
+        elif mode == 'log':
+            log_f = np.logspace(
+                start=np.log10(self.audio_min_freq), stop=np.log10(self.audio_max_freq), num=self.num_colors)
+
+            log_hue = self.closest_freq(log_f, dominant_freq)
+            return self.hue_array[log_hue] / 360, dominant_freq
 
     def closest_freq(self, freq_array, K):
         idx = (np.abs(freq_array - K)).argmin()

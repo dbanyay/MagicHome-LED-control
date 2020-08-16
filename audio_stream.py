@@ -1,11 +1,11 @@
 import pyaudio
-from collections import deque
 import numpy as np
+
 
 
 class AudioInputDevices:
     MIC = "default"
-    STEREO_MIX = "pulse"
+    STEREO_MIX = "kever"
 
 
 class AudioStream:
@@ -22,18 +22,18 @@ class AudioStream:
         device_index = None
         for i in range(self.audio.get_device_count()):
             info = self.audio.get_device_info_by_index(i)
+            print(f'audio device info: {info}')
 
-            if info['name'] == audio_device:
+            if audio_device in info['name']:
                 device_index = info['index']
-
-        if device_index == None:
-            print(f'Audio device {audio_device} not found!')
+                print(f'Current audio device:\n{info}')
 
         # start Recording
         self.stream = self.audio.open(format=self.format,
                                       channels=self.channels,
                                       rate=self.rate,
                                       input=True,
+                                      output=False,
                                       input_device_index=device_index,
                                       frames_per_buffer=self.chunk)
 
