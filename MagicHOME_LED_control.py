@@ -19,7 +19,7 @@ class LEDController():
                  mode: LEDControlMode = LEDControlMode.AUDIO_STEREO_MIX,
                  rgb_buffer_len: int = 8,
                  alpha_buffer_length=8,
-                 silence_buffer_length=2):
+                 silence_buffer_length=1.5):
 
         self.mode = mode
 
@@ -54,6 +54,8 @@ class LEDController():
 
     def updateLED(self):
 
+
+
         if self.mode == LEDControlMode.MONITOR_COLOR:
 
             r, g, b = self.controller.calculate_monitor_average()
@@ -77,6 +79,8 @@ class LEDController():
             r = int(np.round(rgb_norm[0] * 255))
             g = int(np.round(rgb_norm[1] * 255))
             b = int(np.round(rgb_norm[2] * 255))
+
+
 
             for bulb in self.bulbs:
                 bulb.setRgb(r, g, b)

@@ -20,13 +20,13 @@ class HUECOLORS():
 class AudioController():
     def __init__(self,
                  fs: int = 44100,
-                 nperseg: int = 2048,
+                 nperseg: int = 1024,
                  start_hue: int = HUECOLORS.GREEN,
                  inverse_hue: bool = True,
                  num_colors: int = 200,
-                 alpha_rms_max: int = 3000,
+                 alpha_rms_max: int = 10000,
                  alpha_min: int = 0.01,
-                 audio_min_freq: int = 40,
+                 audio_min_freq: int = 20,
                  audio_max_freq: int = 1000,
                  is_verbose: bool = True):
 
